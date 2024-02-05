@@ -74,11 +74,23 @@ const deleteItem = async (req, res) => {
     }
 };
 
+const deleteMultipleItems = async (req, res) => {
+    try {
+        const { ids } = req.body;
+        const item = await pool.query("DELETE FROM MOCK_DATA WHERE id = ANY($1)", [ids]);
+        return res.status(200).json({ message: "Items deleted successfully", result: item});
+    } catch (err) {
+        console.error(err.message);
+        return res.status(500).json({ message: "Server Error", result: null});
+    }
+}
+
 
 module.exports = {
     createItem,
     viewItem,
     viewAllItems,
     updateItem,
-    deleteItem
+    deleteItem,
+    deleteMultipleItems
 };

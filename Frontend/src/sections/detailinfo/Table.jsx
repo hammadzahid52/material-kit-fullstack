@@ -3,14 +3,16 @@ import axios from 'axios';
 import { MdFilterList } from 'react-icons/md';
 import { AiFillDelete } from 'react-icons/ai';
 import DataTable from 'react-data-table-component';
-import PropTypes from 'prop-types';
-// import LongMenu from './utils.jsx';
+import PropTypes, { object } from 'prop-types';
+import { id } from 'date-fns/locale';
 
 const ITEM_HEIGHT = 48;
 function Table() {
   const [data, setData] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState([]);
+  const [rowsForDelete, setrowsForDelete] = useState([]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -74,6 +76,11 @@ function Table() {
       cell: (row) => actionButton(row), // Use actionButton function here
     },
   ];
+  const filteredData = data.filter((row) =>
+    Object.values(row).some(
+      (value) => value && value.toString().toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
   const handleToggleModal = (row) => {
     setIsModalOpen(!isModalOpen);
     setSelectedRow(row);
@@ -85,7 +92,21 @@ function Table() {
     }
   };
   const handleEdit = async (row) => {
-    event.preventDefault();
+    // event.preventDefault();
+    // try {
+    //   const updatedUser = {
+    //     id: row.id,
+    //     first_name: firstName,
+    //     last_name: lastName,
+    //     email: email,
+    //     gender: gender,
+    //   };
+    //   await axios.put('http://localhost:5000/api/update', updatedUser);
+    //   fetchData();
+    //   setIsModalOpen(false);
+    // } catch (error) {
+    //   console.error('Error in Updating the data:', error);
+    // }
     // Implement edit logic here
     handleToggleModal(row);
     console.log('Editing row:', row.id);
@@ -103,6 +124,26 @@ function Table() {
       console.error('Error in deleting data:', error);
     }
   };
+  // Function to handle delete all of the rows
+  // Function to handle delete all of the rows
+  const handleDeleteSelectedRows = async () => {
+    try {
+      // Iterate over selected rows and delete each one
+      const ids = rowsForDelete.map((row) => row.id);
+
+      // Now you can send the IDs to the backend to delete the selected rows
+      const result = await axios.delete('http://localhost:5000/api/deleteMultiple', {
+        data: { ids: ids },
+      });
+      // Refresh the data displayed in the table
+      fetchData();
+      setDeleted(false);
+      console.log(result.data.message);
+    } catch (error) {
+      console.error('Error in deleting selected rows:', error);
+    }
+  };
+
   const actionButton = (row) => (
     <div className="flex">
       <button
@@ -158,6 +199,8 @@ function Table() {
   const handleSelected = ({ selectedRows }) => {
     setLength(selectedRows.length);
     setDeleted(selectedRows.length > 0);
+    setrowsForDelete(selectedRows);
+    console.log('Selected rows:', selectedRows);
   };
 
   return (
@@ -180,7 +223,9 @@ function Table() {
             <div className="bg-[#D0ECFE] py-8 rounded-t-2xl">
               <div className="flex justify-between mx-9 ">
                 <div className="text-blue-500 font-bold">{length} selected</div>
-                <AiFillDelete className="text-xl" />
+                <button onClick={handleDeleteSelectedRows}>
+                  <AiFillDelete className="text-xl" />
+                </button>
               </div>
             </div>
           ) : (
@@ -210,8 +255,9 @@ function Table() {
                         type="search"
                         id="defaultsearch"
                         className="bg-white block w-full p-4 ps-10 text-sm text-gray-900 border border-gray-300 rounded-lg hover:border-black focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                        placeholder="Search Users"
-                        // onChange={handlefilter}
+                        placeholder="Search Users ..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
                   </form>
@@ -225,7 +271,7 @@ function Table() {
 
           <DataTable
             columns={columns}
-            data={data}
+            data={filteredData}
             selectableRows
             onSelectedRowsChange={handleSelected}
             customStyles={customStyles}
@@ -269,7 +315,7 @@ function Table() {
                     </button>
                   </div>
                   <div className="p-4 md:p-5">
-                    <form className="space-y-4" action={handleEdit}>
+                    <form className="space-y-4" action="#">
                       <div>
                         <label
                           htmlFor="first_name"
