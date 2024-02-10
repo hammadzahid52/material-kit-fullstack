@@ -33,6 +33,26 @@ const viewItem = async (req, res) => {
     }
 };
 
+// view selected records
+const selctedrecords = async (req, res) => {
+    try {
+        const { page, limit } = req.query;
+        // console.log(req.body, "req.body");
+        const offset = (page - 1) * limit;
+        const allItems = await pool.query("SELECT * FROM MOCK_DATA LIMIT $1 OFFSET $2", [limit, offset]);
+        const totalRows = await pool.query("SELECT COUNT(*) FROM MOCK_DATA");        
+        allItems.totalRows = totalRows.rows[0].count;
+        
+        return res.status(200).json({ message: "Success", result: allItems });
+
+    } catch (err) {
+        console.error(err.message);
+        return res.status(500).json({ message: "Server Error", result: null });
+    }
+};
+
+
+
 // READ operation 
 const viewAllItems = async (req, res) => {
     try {
@@ -48,8 +68,8 @@ const viewAllItems = async (req, res) => {
 // UPDATE operation
 const updateItem = async (req, res) => {
     try {
-
         const {id, first_name, last_name, email, gender, ip_address } = req.body;
+        
         const updatedItem = await pool.query(
             "UPDATE MOCK_DATA SET first_name = $1, last_name = $2, email = $3, gender = $4, ip_address = $5 WHERE id = $6 RETURNING *",
             [first_name, last_name, email, gender, ip_address, id]
@@ -92,5 +112,6 @@ module.exports = {
     viewAllItems,
     updateItem,
     deleteItem,
-    deleteMultipleItems
+    deleteMultipleItems,
+    selctedrecords
 };
