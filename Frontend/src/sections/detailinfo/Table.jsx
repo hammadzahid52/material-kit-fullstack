@@ -1,91 +1,82 @@
-import React, { useEffect, useState } from 'react';
-
 import axios from 'axios';
 import { MdFilterList } from 'react-icons/md';
-import { AiFillDelete } from 'react-icons/ai';
-import DataTable from 'react-data-table-component';
-import { useForm } from 'react-hook-form';
 import Swal from 'sweetalert2';
-// import PropTypes, { object } from 'prop-types';
+import { AiFillDelete } from 'react-icons/ai';
+import React, { useState, useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+import DataTable from 'react-data-table-component';
+import { useQuery, QueryClient, QueryCache } from '@tanstack/react-query';
 
-const ITEM_HEIGHT = 48;
 function Table() {
   const [data, setData] = useState([]);
   const [totalRows, setTotalRows] = useState(0);
   const [perPage, setPerPage] = useState(5);
-  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isaddModalOpen, setIsaddModalOpen] = useState(false);
-  const [newrecord, setNewRecord] = useState([]);
+  // const [newrecord, setNewRecord] = useState([]);
   const [selectedRow, setSelectedRow] = useState([]);
   const [rowsForDelete, setrowsForDelete] = useState([]);
   const [record, setRecord] = useState([]);
   const [ip, setIp] = useState('');
+  const [page, setPage] = useState(1);
+  const [length, setLength] = useState(0);
+  const [deleted, setDeleted] = useState(false);
+
   const {
     register,
     handleSubmit,
-    formState: { errors, isDirty, isValid, touchedFields },
+    formState: { errors },
     trigger,
-    setFocus,
     setValue,
     reset,
   } = useForm({ defaultValues: { test: 'Setting default values' } });
 
-  // const fetchData 1= async () => {
-  //   try {
-  //     const response = await axios.get('http://localhost:5000/api/viewAll');
-  //     setData(response.data.result.rows);
-  //     // console.log(response.data.result.rows);
-  //   } catch (error) {
-  //     console.error('Error fetching data:', error);
-  //   }
-  // };
-  // useEffect(() => {
-  //   fetchData(1);
-  // }, []);
-
-  const fetchData = async (page) => {
-    setLoading(true);
-    const response = await axios.get(
-      `http://localhost:5000/api/selctedrecords?page=${page}&limit=${perPage}`
-    );
-    setData(response.data.result.rows);
-    console.log(response.data.message);
-    setTotalRows(response.data.result.totalRows);
-    setLoading(false);
-  };
-  const handlePageChange = (page) => {
-    fetchData(page);
+  const fetchData = async (pageNo, rowsPerPage) => {
+    try {
+      console.log('rowsPerPage ', rowsPerPage);
+      const response = await axios.get(
+        `http://localhost:5000/api/selctedrecords?page=${pageNo}&limit=${rowsPerPage}`
+      );
+      setData(response.data.result.rows);
+      setTotalRows(response.data.result.totalRows);
+      return response;
+    } catch (error) {
+      console.log('Error in fetching Data :', error);
+    }
   };
 
-  // const handlePerRowsChange = async (newPerPage, page) => {
-  //   setLoading(true);
-  //   const response = await axios.get(
-  //     `http://localhost:5000/api/selctedrecords?page=${page}&limit=${perPage}`
-  //   );
-  //   setData(response.data.result.rows);
-  //   setTotalRows(response.data.result.rowCount);
-  //   setPerPage(newPerPage);
-  //   setLoading(false);
-  // };
-
+  const {
+    isPending,
+    error,
+    isLoading,
+    isFetching,
+    data: rows,
+  } = useQuery({
+    queryKey: ['userData', page, perPage],
+    queryFn: () => fetchData(page, perPage),
+    cacheTime: 1 * 60 * 1000,
+    staleTime: 3 * 60 * 1000,
+    keepPreviousData: true,
+    onSuccess: () => console.log('Data Fetched Successfully'),
+  });
+  console.log('Checking Cache :', { isLoading, isFetching });
+  // console.log('rows: ', rows);
   const handlePerRowsChange = async (newPerPage, page) => {
-    setLoading(true);
-    const nextPage = newPerPage !== perPage ? 1 : page; // Reset page number if rows per page changed
-    const response = await axios.get(
-      `http://localhost:5000/api/selctedrecords?page=${nextPage}&limit=${newPerPage}`
-    );
+    const response = await fetchData(page, newPerPage);
     setData(response.data.result.rows);
     setTotalRows(response.data.result.totalRows);
     setPerPage(newPerPage);
-    setLoading(false);
   };
+
+  const handlePageChange = (page) => {
+    setPage(page);
+  };
+
   useEffect(() => {
-    fetchData(1);
+    fetchData(1, 5);
   }, []);
-  const [length, setLength] = useState(0);
-  const [deleted, setDeleted] = useState(false);
+
   // console.log(data);
 
   // Sweat Alert
@@ -112,7 +103,7 @@ function Table() {
 
     fetchIp();
   }, []);
-  console.log(ip);
+  // console.log(ip);
 
   const columns = [
     {
@@ -162,26 +153,26 @@ function Table() {
     )
   );
   // Function to handle adding new record
-  const handleNewRecord = async (data) => {
+  const handleNewRecord = async (newrecord) => {
     event.preventDefault();
-    console.log(newrecord);
+
     try {
-      const result = await axios.post('http://localhost:5000/api/create', {
-        first_name: data.first_name,
-        last_name: data.last_name,
-        email: data.email,
-        gender: data.gender,
+      const newdata = await axios.post('http://localhost:5000/api/create', {
+        first_name: newrecord.first_name,
+        last_name: newrecord.last_name,
+        email: newrecord.email,
+        gender: newrecord.gender,
         ip_address: ip,
       });
       Toast.fire({
         icon: 'success',
         title: 'Data Added Successfully!',
       });
-      fetchData(1);
+      fetchData(1, 5);
       reset();
       setIsaddModalOpen(false);
 
-      console.log(result.data.message);
+      console.log(newdata.data.message);
     } catch (error) {
       console.error('Error in adding new record:', error);
     }
@@ -205,55 +196,103 @@ function Table() {
   };
   const handleUpdate = async () => {
     event.preventDefault();
-
     console.log(record);
-
     try {
       // const id = row.id;
-      const result = await axios.put('http://localhost:5000/api/update', {
+      const updaterecord = await axios.put('http://localhost:5000/api/update', {
         id: record.id,
         first_name: record.first_name,
         last_name: record.last_name,
         email: record.email,
         gender: record.gender,
+        ip_address: record.ip_address,
       });
-      fetchData(1);
+      Toast.fire({
+        icon: 'success',
+        title: 'Data Updated Successfully!',
+      });
+      fetchData(1, 5);
       setIsModalOpen(false);
-      console.log(result.data.message);
+      console.log(updaterecord.data.message);
     } catch (error) {
       console.error('Error in updating data:', error);
     }
   };
   // Function to handle delete action
   const handleDelete = async (row) => {
-    try {
-      const id = row.id;
-      const result = await axios.delete('http://localhost:5000/api/delete', { data: { id: id } });
-      fetchData(1);
-      console.log(result.data.message);
-    } catch (error) {
-      console.error('Error in deleting data:', error);
-    }
+    Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!',
+    }).then(async (deleterecord) => {
+      if (deleterecord.isConfirmed) {
+        try {
+          const id = row.id;
+          const delrecord = await axios.delete('http://localhost:5000/api/delete', {
+            data: { id },
+          });
+          fetchData(1, 5);
+          Swal.fire({
+            title: 'Deleted!',
+            text: 'Your file has been deleted.',
+            icon: 'success',
+          });
+          console.log(delrecord.data.message);
+        } catch (error) {
+          console.error('Error in deleting data:', error);
+        }
+      }
+    });
   };
 
   // Function to handle delete all of the rows
-  const handleDeleteSelectedRows = async () => {
-    try {
-      // Iterate over selected rows and delete each one
-      const ids = rowsForDelete.map((row) => row.id);
-
-      // Now you can send the IDs to the backend to delete the selected rows
-      const result = await axios.delete('http://localhost:5000/api/deleteMultiple', {
-        data: { ids: ids },
-      });
-      // Refresh the data displayed in the table
-      fetchData(1);
-      setDeleted(false);
-      console.log(result.data.message);
-    } catch (error) {
-      console.error('Error in deleting selected rows:', error);
-    }
+  const handleDeleteSelectedRows = async (row) => {
+    Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3085d6',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Yes, delete it!',
+    }).then(async (deleteallrecord) => {
+      if (deleteallrecord.isConfirmed) {
+        try {
+          const ids = rowsForDelete.map((delrow) => delrow.id);
+          const delallrecord = await axios.delete('http://localhost:5000/api/deleteMultiple', {
+            data: { ids },
+          });
+          fetchData(1, 5);
+          setDeleted(false);
+          Swal.fire({
+            title: 'Deleted!',
+            text: 'Your file has been deleted.',
+            icon: 'success',
+          });
+          console.log(delallrecord.data.message);
+        } catch (error) {
+          console.error('Error in deleting Selected Rows:', error);
+        }
+      }
+    });
   };
+  // const handleDeleteSelectedRows = async () => {
+  //   try {
+  //     const ids = rowsForDelete.map((row) => row.id);
+  //     const result = await axios.delete('http://localhost:5000/api/deleteMultiple', {
+  //       data: { ids: ids },
+  //     });
+  //     fetchData(1);
+  //     setDeleted(false);
+  //     console.log(result.data.message);
+  //   } catch (error) {
+  //     console.error('Error in deleting selected rows:', error);
+  //   }
+  // };
 
   const actionButton = (row) => (
     <div className="flex">
@@ -265,6 +304,7 @@ function Table() {
         Edit
       </button>
       <button
+        type="button"
         className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
         onClick={() => handleDelete(row)}
       >
@@ -335,7 +375,7 @@ function Table() {
             <div className="bg-[#D0ECFE] py-8 rounded-t-2xl">
               <div className="flex justify-between mx-9 ">
                 <div className="text-blue-500 font-bold">{length} selected</div>
-                <button onClick={handleDeleteSelectedRows}>
+                <button type="button" onClick={handleDeleteSelectedRows}>
                   <AiFillDelete className="text-xl" />
                 </button>
               </div>
@@ -383,7 +423,7 @@ function Table() {
 
           <DataTable
             columns={columns}
-            data={data}
+            data={filteredData}
             selectableRows
             onSelectedRowsChange={handleSelected}
             customStyles={customStyles}
@@ -440,26 +480,27 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           First Name
+                          <input
+                            type="text"
+                            name="first_name"
+                            id="first_name"
+                            {...register('first_name', {
+                              required: {
+                                value: true,
+                                message: 'First Name is required',
+                              },
+                              maxLength: {
+                                value: 18,
+                                message: 'First Name Can not be greater than 8 characters',
+                              },
+                            })}
+                            onChange={(e) => handleInputChange('first_name', e.target.value)}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="First Name"
+                            required
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="first_name"
-                          id="first_name"
-                          {...register('first_name', {
-                            required: {
-                              value: true,
-                              message: 'First Name is required',
-                            },
-                            maxLength: {
-                              value: 8,
-                              message: 'First Name Can not be greater than 8 characters',
-                            },
-                          })}
-                          onChange={(e) => handleInputChange('first_name', e.target.value)}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="First Name"
-                          required
-                        />
+
                         {errors.first_name && (
                           <p className="text-red-600 text-xs ml-2">{errors.first_name.message}</p>
                         )}
@@ -470,26 +511,27 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           Last Name
+                          <input
+                            type="text"
+                            name="last_name"
+                            id="last_name"
+                            {...register('last_name', {
+                              required: {
+                                value: true,
+                                message: 'Last Name is required',
+                              },
+                              maxLength: {
+                                value: 18,
+                                message: 'Last Name Can not be greater than 8 characters',
+                              },
+                            })}
+                            onChange={(e) => handleInputChange('last_name', e.target.value)}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="Last Name"
+                            required
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="last_name"
-                          id="last_name"
-                          {...register('last_name', {
-                            required: {
-                              value: true,
-                              message: 'Last Name is required',
-                            },
-                            maxLength: {
-                              value: 8,
-                              message: 'Last Name Can not be greater than 8 characters',
-                            },
-                          })}
-                          onChange={(e) => handleInputChange('last_name', e.target.value)}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="Last Name"
-                          required
-                        />
+
                         <p className="text-red-600 text-xs ml-2">{errors.last_name?.message}</p>
                       </div>
                       <div>
@@ -498,28 +540,29 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           Email
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          id="email"
-                          {...register('email', {
-                            required: {
-                              value: true,
-                              message: 'Email is required',
-                            },
+                          <input
+                            type="email"
+                            name="email"
+                            id="email"
+                            {...register('email', {
+                              required: {
+                                value: true,
+                                message: 'Email is required',
+                              },
 
-                            pattern: {
-                              value:
-                                /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
-                              message: 'Invalid Email',
-                            },
-                          })}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="Email"
-                          required
-                        />
+                              pattern: {
+                                value:
+                                  /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|.(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+                                message: 'Invalid Email',
+                              },
+                            })}
+                            onChange={(e) => handleInputChange('email', e.target.value)}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="Email"
+                            required
+                          />
+                        </label>
+
                         <p className="text-red-600 text-xs ml-2">{errors.email?.message}</p>
                       </div>
                       <div>
@@ -528,19 +571,20 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           Gender
+                          <select
+                            name="gender"
+                            id="gender"
+                            {...register('gender', { required: 'Gender is Required' })}
+                            onChange={(e) => handleInputChange('gender', e.target.value)}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            required
+                          >
+                            <option value="">Select gender</option>
+                            <option value="male">Male</option>
+                            <option value="female">Female</option>
+                          </select>
                         </label>
-                        <select
-                          name="gender"
-                          id="gender"
-                          {...register('gender', { required: 'Gender is Required' })}
-                          onChange={(e) => handleInputChange('gender', e.target.value)}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          required
-                        >
-                          <option value="">Select gender</option>
-                          <option value="male">Male</option>
-                          <option value="female">Female</option>
-                        </select>
+
                         <p className="text-red-600 text-xs ml-2">{errors.gender?.message}</p>
                       </div>
                       <div>
@@ -549,17 +593,17 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           IP Address
+                          <input
+                            type="text"
+                            name="ip_address"
+                            id="ip_address"
+                            value={ip}
+                            readOnly
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="IP Address"
+                            required
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="ip_address"
-                          id="ip_address"
-                          value={ip}
-                          readOnly
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="IP Address"
-                          required
-                        />
                       </div>
                       <button
                         type="submit"
@@ -614,16 +658,17 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           First Name
+                          <input
+                            type="text"
+                            name="first_name"
+                            id="first_name"
+                            value={record.first_name}
+                            onChange={(e) => setRecord({ ...record, first_name: e.target.value })}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="First Name"
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="first_name"
-                          id="first_name"
-                          value={record.first_name}
-                          onChange={(e) => setRecord({ ...record, first_name: e.target.value })}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="First Name"
-                        />
+
                         {errors.first_name && (
                           <p className="text-red-600 text-xs ml-2">{errors.first_name.message}</p>
                         )}
@@ -631,21 +676,21 @@ function Table() {
 
                       <div>
                         <label
-                          htmlFor="email"
+                          htmlFor="last_name"
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           Last Name
+                          <input
+                            type="text"
+                            name="last_name"
+                            id="last_name"
+                            value={record.last_name}
+                            onChange={(e) => setRecord({ ...record, last_name: e.target.value })}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="Last Name"
+                            required
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="last_name"
-                          id="last_name"
-                          value={record.last_name}
-                          onChange={(e) => setRecord({ ...record, last_name: e.target.value })}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="Last Name"
-                          required
-                        />
                       </div>
                       <div>
                         <label
@@ -653,17 +698,17 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           Email
+                          <input
+                            type="email"
+                            name="email"
+                            id="email"
+                            value={record.email}
+                            onChange={(e) => setRecord({ ...record, email: e.target.value })}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="Email"
+                            required
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="email"
-                          id="email"
-                          value={record.email}
-                          onChange={(e) => setRecord({ ...record, email: e.target.value })}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="Email"
-                          required
-                        />
                       </div>
                       <div>
                         <label
@@ -671,17 +716,35 @@ function Table() {
                           className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
                         >
                           Gender
+                          <input
+                            type="text"
+                            name="gender"
+                            id="gender"
+                            value={record.gender}
+                            onChange={(e) => setRecord({ ...record, gender: e.target.value })}
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="Gender"
+                            required
+                          />
                         </label>
-                        <input
-                          type="text"
-                          name="gender"
-                          id="gender"
-                          value={record.gender}
-                          onChange={(e) => setRecord({ ...record, gender: e.target.value })}
-                          className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
-                          placeholder="Gender"
-                          required
-                        />
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="ip_address"
+                          className="block mb-2 text-sm font-medium text-gray-900 dark:text-white"
+                        >
+                          IP Address
+                          <input
+                            type="text"
+                            name="ip_address"
+                            id="ip_address"
+                            value={record.ip_address}
+                            readOnly
+                            className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-600 dark:border-gray-500 dark:placeholder-gray-400 dark:text-white"
+                            placeholder="Ip Address"
+                            required
+                          />
+                        </label>
                       </div>
                       <button
                         type="submit"
